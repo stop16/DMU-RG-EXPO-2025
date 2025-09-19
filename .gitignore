@@ -1,0 +1,67 @@
+# Arduino IDE build files and temporary files
+*.elf
+*.hex
+*.bin
+*.map
+*.eep
+*.lst
+*.o
+*.d
+*.su
+*.s
+*.sym
+*.core
+*.gcno
+*.gcda
+*.gcov
+*.ipch
+
+# Arduino IDE specific files
+*.ino.hex
+*.ino.elf
+*.ino.bin
+*.ino.map
+*.ino.eep
+*.ino.lst
+*.ino.su
+*.ino.s
+*.ino.sym
+*.ino.core
+*.ino.gcno
+*.ino.gcda
+*.ino.gcov
+*.ino.ipch
+
+# Visual Studio / Visual Micro specific files
+_vm/
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.suo
+*.user
+*.aps
+*.ncb
+*.pdb
+*.obj
+*.ilk
+*.idb
+*.tlog
+*.log
+*.res
+*.bak
+*.tmp
+*.vsp
+*.vspx
+*.vsarduino.h
+*.xml
+
+# PlatformIO specific files
+.pio/
+.vscode/
+
+# Other common ignored files
+.DS_Store
+Thumbs.db
+
+
