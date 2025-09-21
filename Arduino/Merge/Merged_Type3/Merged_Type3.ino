@@ -2,10 +2,11 @@
  * 2025 RG EXPO Code (Merge ver) Type 3
  * Components
  * 1. 1x Dot Matrix
-
+ *
  * Scenario
  * 1. Set Dot Matrix text '통신중' when receive 'c'
  * 2. Set Dot Matrix text '통신불가' when receive 'n'
+ * 3. Toggle compact/animation mode when receive 'm'
  */
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
@@ -40,29 +41,23 @@
 
 #define MY_TYPE 9
 
+// --- Korean Character Font Data (15 columns each) ---
 // '통'
-#define CHAR_TONG 0x0000, 0x0000, 0x0080, 0x7c9c, 0x54a2, 0x54a2, 0x54a2, 0x57a2, 0x54a2, 0x54a2, 0x54a2, 0x009c, 0x0000, 0x0000, 0x0000 //통
+#define CHAR_TONG 0x0000, 0x0080, 0x7c9c, 0x54a2, 0x54a2, 0x57a2, 0x54a2, 0x54a2, 0x009c, 0x0000 //통
 // '신'
-#define CHAR_SIN 0x0000, 0x0080, 0x0180, 0x033e, 0x0602, 0x7c02, 0x0602, 0x0302, 0x0182, 0x0082, 0x0002, 0x7f82, 0x0000, 0x0000, 0x0000 //신
+#define CHAR_SIN 0x0080, 0x033e, 0x0602, 0x7c02, 0x0602, 0x0302, 0x0082, 0x0002, 0x7f82, 0x0000 //신
 // '중'
-#define CHAR_JOONG 0x0000, 0x0080, 0x408c, 0x4292, 0x4692, 0x4c92, 0x78f2, 0x78f2, 0x4c92, 0x4692, 0x4292, 0x408c, 0x0080, 0x0000, 0x0000 //중
+#define CHAR_JOONG 0x0080, 0x408c, 0x4292, 0x4692, 0x4c92, 0x78f2, 0x78f2, 0x4c92, 0x4692, 0x4292, 0x408c, 0x0080, 0x0000 //중
 // '불'
-#define CHAR_BUL 0x0000, 0x0000, 0x0080, 0x7eae, 0x12aa, 0x12aa, 0x12aa, 0x12ea, 0x12aa, 0x12aa, 0x7eba, 0x0080, 0x0000, 0x0000, 0x0000 //불
+#define CHAR_BUL 0x0000, 0x0080, 0x7eae, 0x12aa, 0x12aa, 0x12aa, 0x12ea, 0x12aa, 0x12aa, 0x7eba, 0x0080, 0x0000 //불
 // '가'
-#define CHAR_GA 0x0000, 0x1000, 0x1004, 0x1004, 0x1008, 0x1010, 0x1060, 0x1180, 0x1e00, 0x0000, 0x0000, 0x7ffe, 0x0080, 0x0080, 0x0000 //가
+#define CHAR_GA 0x1000, 0x1004, 0x1004, 0x1008, 0x1010, 0x1060, 0x1180, 0x1e00, 0x0000, 0x0000, 0x7ffe, 0x0080, 0x0080, 0x0000 //가
 
-// 각 텍스트의 총 컬럼 수를 정의
-const int DISCONNECTED_COLUMNS = 90;
-const int CONNECTED_COLUMNS = 158;
-
+// --- Normal Fonts (with animation padding) ---
 const uint16_t disconnected_font[] PROGMEM = {
   // 공백 (16열)
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
-  CHAR_TONG,
-  CHAR_SIN,
-  CHAR_BUL,
-  CHAR_GA,
-
+  CHAR_TONG, CHAR_SIN, CHAR_BUL, CHAR_GA,
   // 공백 (16열)
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
 };
@@ -70,21 +65,42 @@ const uint16_t disconnected_font[] PROGMEM = {
 const uint16_t con_font[] PROGMEM = {
   // 공백 (16열)
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
-  CHAR_TONG,
-  CHAR_SIN,
-  CHAR_JOONG,
-
+  CHAR_TONG, CHAR_SIN, CHAR_JOONG,
   // 공백 (16열)
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
 };
 
-// SRAM에 저장될 동적 폰트 버퍼 (최대 크기)
-uint16_t active_font_buffer[CONNECTED_COLUMNS];
-// 현재 폰트의 총 컬럼 수를 저장하는 변수
+// --- Compact Fonts (Minimal Spacing for static display) ---
+const uint16_t disconnected_font_compact[] PROGMEM = {
+  CHAR_TONG, CHAR_SIN, CHAR_BUL, CHAR_GA,
+};
+
+const uint16_t con_font_compact[] PROGMEM = {
+  CHAR_TONG, CHAR_SIN, CHAR_JOONG,
+};
+
+// 각 텍스트의 총 컬럼 수를 정의
+const int DISCONNECTED_COLUMNS = sizeof(disconnected_font) / sizeof(disconnected_font[0]);
+const int CONNECTED_COLUMNS = sizeof(con_font) / sizeof(con_font[0]);
+const int DISCONNECTED_COLUMNS_COMPACT = sizeof(disconnected_font_compact) / sizeof(disconnected_font_compact[0]);
+const int CONNECTED_COLUMNS_COMPACT = sizeof(con_font_compact) / sizeof(con_font_compact[0]);
+
+// 모든 폰트 중 가장 큰 크기를 버퍼 크기로 정의
+#define MAX_FONT_COLUMNS DISCONNECTED_COLUMNS
+
+// --- Global Variables ---
+uint16_t active_font_buffer[MAX_FONT_COLUMNS];
 volatile int current_font_total_columns;
 volatile int scroll_offset = 0;
 volatile bool needs_update = true;
 uint8_t g_color = 0;
+
+// NEW: 모드 관리를 위한 상태 변수
+volatile bool isCompactMode = false;
+char currentTextState = 'n'; // 'n': 통신불가, 'c': 통신중
+
+// 함수 프로토타입 선언
+void updateTextAndMode();
 
 // 동적으로 폰트 데이터를 로드하는 함수
 void load_font(const uint16_t *source_font, int total_columns) {
@@ -92,7 +108,7 @@ void load_font(const uint16_t *source_font, int total_columns) {
     active_font_buffer[i] = pgm_read_word(&source_font[i]);
   }
   // 나머지 버퍼는 0으로 채움
-  for (int i = total_columns; i < CONNECTED_COLUMNS; ++i) {
+  for (int i = total_columns; i < MAX_FONT_COLUMNS; ++i) {
     active_font_buffer[i] = 0x0000;
   }
   current_font_total_columns = total_columns;
@@ -100,11 +116,10 @@ void load_font(const uint16_t *source_font, int total_columns) {
   needs_update = true;
 }
 
-// --- 나머지 함수들은 변경된 변수명을 사용하도록 수정 ---
-
 uint16_t display_buffer_left[16];
 uint16_t display_buffer_right[16];
 
+// 스크롤 애니메이션을 위한 타이머 인터럽트
 ISR(TIMER2_OVF_vect) {
   static int tick_count = 0;
   const int SCROLL_INTERVAL = 500;
@@ -113,7 +128,6 @@ ISR(TIMER2_OVF_vect) {
   if (tick_count >= SCROLL_INTERVAL) {
     tick_count = 0;
     scroll_offset++;
-    // 현재 폰트의 총 컬럼 수에 맞춰 스크롤 오프셋을 리셋
     if (scroll_offset >= current_font_total_columns) {
       scroll_offset = 0;
     }
@@ -128,21 +142,24 @@ void update_display_buffers() {
 
   for (int col = 0; col < 32; ++col) {
     int font_col_index = scroll_offset + col;
-    // 현재 폰트의 총 컬럼 수에 맞춰 인덱스 계산
-    if (font_col_index >= current_font_total_columns) {
-      font_col_index -= current_font_total_columns;
-    }
-
-    uint16_t font_column_data = active_font_buffer[font_col_index];
-
-    for (int row = 0; row < 16; ++row) {
-      if ((font_column_data >> row) & 1) {
-        if (col < 16) {
-          display_buffer_left[row] |= (1 << (15 - col));
-        } else {
-          display_buffer_right[row] |= (1 << (15 - (col - 16)));
-        }
+    if (current_font_total_columns > 0) {
+       // 애니메이션 모드일 때만 순환
+      if (!isCompactMode) {
+        font_col_index %= current_font_total_columns;
       }
+    }
+    
+    if(font_col_index < current_font_total_columns) {
+        uint16_t font_column_data = active_font_buffer[font_col_index];
+        for (int row = 0; row < 16; ++row) {
+          if ((font_column_data >> row) & 1) {
+            if (col < 16) {
+              display_buffer_left[row] |= (1 << (15 - col));
+            } else {
+              display_buffer_right[row] |= (1 << (15 - (col - 16)));
+            }
+          }
+        }
     }
   }
 }
@@ -150,14 +167,33 @@ void update_display_buffers() {
 void refresh_display() {
   for (int row = 0; row < 16; ++row) {
     row_dynamic(row);
-
     uint16_t left_data = display_buffer_left[row];
     uint16_t right_data = display_buffer_right[row];
-
     shift_Register2((right_data >> 8), (right_data & 0xFF), row, g_color);
     shift_Register2((left_data >> 8), (left_data & 0xFF), row, g_color);
-
     ActivePulse();
+  }
+}
+
+// NEW: 현재 상태에 맞춰 폰트와 애니메이션을 설정하는 함수
+void updateTextAndMode() {
+  if (isCompactMode) {
+    // 압축 모드: 애니메이션 중지, 압축 폰트 로드
+    TIMSK2 = 0x00; // 타이머 인터럽트 비활성화
+    scroll_offset = 0; // 스크롤 위치 초기화
+    if (currentTextState == 'c') {
+      load_font(con_font_compact, CONNECTED_COLUMNS_COMPACT);
+    } else {
+      load_font(disconnected_font_compact, DISCONNECTED_COLUMNS_COMPACT);
+    }
+  } else {
+    // 일반 모드: 일반 폰트 로드 후 애니메이션 시작
+    if (currentTextState == 'c') {
+      load_font(con_font, CONNECTED_COLUMNS);
+    } else {
+      load_font(disconnected_font, DISCONNECTED_COLUMNS);
+    }
+    TIMSK2 = 0x01; // 타이머 인터럽트 활성화
   }
 }
 
@@ -172,7 +208,12 @@ void setup() {
   TCNT2 = 0xe7;
   sei();
   Serial.begin(115200);
-  load_font(disconnected_font, DISCONNECTED_COLUMNS);
+
+  // 초기 상태 설정 ('통신불가', 일반 모드)
+  currentTextState = 'n';
+  g_color = 1; // RED
+  updateTextAndMode(); // 새 핸들러를 호출하여 디스플레이 초기화
+
   Serial.println(MY_TYPE);
 }
 
@@ -182,11 +223,21 @@ void loop() {
     switch (input) {
       case 'n':
         g_color = 1; // RED
-        load_font(disconnected_font, DISCONNECTED_COLUMNS);
+        if (currentTextState != 'n') {
+            currentTextState = 'n';
+            updateTextAndMode();
+        }
         break;
       case 'c':
         g_color = 2; // GREEN
-        load_font(con_font, DISCONNECTED_COLUMNS);
+        if (currentTextState != 'c') {
+            currentTextState = 'c';
+            updateTextAndMode();
+        }
+        break;
+      case 'm': // NEW: 모드 전환
+        isCompactMode = !isCompactMode;
+        updateTextAndMode();
         break;
       case 'q':
         Serial.println(MY_TYPE);
@@ -213,13 +264,10 @@ void row_dynamic(uint8_t i) {
 
 void shift_Register2(unsigned char high, unsigned char low, unsigned char cnt_row, uint8_t BCD_Num) {
   uint16_t buff = ((uint16_t)high << 8) | low;
-
   for (int clk = 0; clk < 16; clk++) {
     if ((buff >> clk) & 1) {
       switch (BCD_Num) {
-        case 0:
-          R1_OFF; B1_OFF; G1_OFF; R2_OFF; B2_OFF; G2_OFF;
-          break;
+        case 0: R1_OFF; B1_OFF; G1_OFF; R2_OFF; B2_OFF; G2_OFF; break;
         case 1:
           if (cnt_row < 8) { R1_ON; B1_OFF; G1_OFF; R2_OFF; B2_OFF; G2_OFF; }
           else { R2_ON; B2_OFF; G2_OFF; R1_OFF; B1_OFF; G1_OFF; }

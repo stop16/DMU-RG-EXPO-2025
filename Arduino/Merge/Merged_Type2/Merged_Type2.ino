@@ -82,7 +82,7 @@ void setup() {
   Servo_1.attach(PIN_SERVO);
   CR_Servo_1.writeMicroseconds(1500);
   CR_Servo_2.writeMicroseconds(1500);
-  Servo_1.writeMicroseconds(1500);
+  Servo_1.write(0);
   // UART Setup
   Serial.begin(115200);
   // ToF Setup
@@ -92,6 +92,7 @@ void setup() {
   {
     // while (1) {}
   }
+  else Serial.println("TOF INIT");
   ToF_sensor.startContinuous();
   Serial.println(MY_TYPE);
 }
@@ -168,10 +169,10 @@ void servo_set_position(uint8_t position)
 {
     switch(position) {
         case SERVO_DOWN:
-            Servo_1.write(135);
+            Servo_1.write(170);
             break;
         case SERVO_UP:
-            Servo_1.write(45);
+            Servo_1.write(20);
             break;
         case SERVO_STOP:
             Servo_1.write(90);

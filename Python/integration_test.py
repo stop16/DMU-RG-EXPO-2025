@@ -35,9 +35,20 @@ def set_dot_matrix(text:str):
         for i in range(len(obj_9)):
             port_obj[obj_9[i]].write('n'.encode())
 
+def toggle_animation():
+    """도트매트릭스 애니메이션 토글
+    """
+    for i in range(len(obj_9)):
+        port_obj[obj_9[i]].write('m'.encode())
+
+def set_earthquake(data:bool):
+    if data == True:
+        port_obj[obj_8].write('1'.encode())
+    elif data == False:
+        port_obj[obj_8].write('0'.encode())
 
 # TODO: 실제 Port 이름으로 변경
-port_obj = ['/dev/tty.usbmodem12301', '/dev/tty.usbmodem124101', '/dev/tty.usbmodem124201', '/dev/tty.usbmodem124401', '/dev/tty.usbserial-12430']
+port_obj = ['/dev/tty.usbmodem11301', '/dev/tty.usbmodem114101', '/dev/tty.usbmodem114201', '/dev/tty.usbmodem114401', '/dev/tty.usbserial-11430']
 
 # 포트 개방
 for i in range(len(port_obj)):
@@ -61,7 +72,7 @@ print("안정화 중...")
 # 아두이노 부팅 시간 대기해야 함
 # 테스트 결과: 5초면 확실히 동작함
 # 줄여보면서 테스트 권장
-time.sleep(5)
+time.sleep(3)
 
 # Query해서 아두이노 펌웨어 타입 확인
 for i in range(len(port_obj)):
@@ -78,22 +89,29 @@ for i in range(len(port_obj)):
 
 print("안정화 끝!")
 
-# 동작 시작 전 대기, 지워도 됨
-time.sleep(3)
+while True:
+    a = input(f"Action \n1) 통신중\t 2) 통신 불가\t 3) 애니메이션 변경\t 4) 지진 ON\t 5) 지진 OFF\t e) 종료\n 입력: ")
+    if a == "1":
+        set_led('GREEN')
+        set_dot_matrix('통신중')
 
-# 우선 통신 단절 먼저 표현
-set_led('RED')
-set_dot_matrix('통신불가')
+    elif a == "2":
+        set_led('RED')
+        set_dot_matrix('통신불가')
+    
+    elif a == "3":
+        toggle_animation()
 
-# 3초 대기
-time.sleep(3)
+    elif a == "4":
+        set_earthquake(True)
 
-# 통신중 표현
-set_led('GREEN')
-set_dot_matrix('통신중')
+    elif a == "5":
+        set_earthquake(False)
+    
+    elif a == "e":
+        print("종료")
+        break
 
-# 3초 대기
-time.sleep(3)
 
 # 포트 닫기
 for i in range(1,len(port_obj)):
