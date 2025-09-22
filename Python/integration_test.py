@@ -112,6 +112,10 @@ while True:
         print("종료")
         break
 
+# 종료 전 모두 초기상태로 원상 복구
+set_earthquake(False)
+set_dot_matrix('통신중')
+set_led('GREEN')
 
 # 포트 닫기
 for i in range(1,len(port_obj)):
