@@ -1,5 +1,29 @@
 import serial
 import time
+import threading
+
+# Lock 객체
+lock = threading.Lock()
+
+# 도트매트릭스 동기화 명령 전송 주기
+SYNC_INTERVAL = 10 # 단위: 분
+
+# 도트매트릭스 상태 저장
+dot_matrix_current_state = ""
+
+def thread_dot_matrix_sync():
+    """도트 매트릭스 동기화 Thread
+    """
+    while True:
+        time.sleep(60*SYNC_INTERVAL)
+        with lock:
+            current_state_snapshot = dot_matrix_current_state
+        if current_state_snapshot == '통신중':
+            for i in range(len(obj_9)):
+                port_obj[obj_9[i]].write('c'.encode())
+        elif current_state_snapshot == '통신불가':
+            for i in range(len(obj_9)):
+                port_obj[obj_9[i]].write('n'.encode())
 
 def set_led(color:str):
     """LED 스트립 색상 설정
@@ -28,12 +52,18 @@ def set_dot_matrix(text:str):
     Args:
         text (str): 통신중, 통신불가 중 하나 입력하면 설정됨
     """
+    global dot_matrix_current_state
+    
     if text == '통신중':
         for i in range(len(obj_9)):
             port_obj[obj_9[i]].write('c'.encode())
+        with lock:
+            dot_matrix_current_state = "통신중"
     elif text == '통신불가':
         for i in range(len(obj_9)):
             port_obj[obj_9[i]].write('n'.encode())
+        with lock:
+            dot_matrix_current_state = "통신불가"
 
 def toggle_animation():
     """도트매트릭스 애니메이션 토글
@@ -89,6 +119,11 @@ for i in range(len(port_obj)):
 
 print("안정화 끝!")
 
+# Thread 시작
+dot_sync_thread = threading.Thread(target=thread_dot_matrix_sync)
+dot_sync_thread.daemon = True  # 데몬 스레드로 설정하여 메인 프로그램 종료 시 자동 종료
+dot_sync_thread.start()
+
 while True:
     a = input(f"Action \n1) 통신중\t 2) 통신 불가\t 3) 애니메이션 변경\t 4) 지진 ON\t 5) 지진 OFF\t e) 종료\n 입력: ")
     if a == "1":
@@ -118,7 +153,7 @@ set_dot_matrix('통신중')
 set_led('GREEN')
 
 # 포트 닫기
-for i in range(1,len(port_obj)):
+for i in range(len(port_obj)):
     port_obj[i].close()
 
 print("Finish!")
