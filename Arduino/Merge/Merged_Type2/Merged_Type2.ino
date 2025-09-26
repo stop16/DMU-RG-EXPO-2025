@@ -73,16 +73,6 @@ void cr_servo_set_state(uint8_t state);
 uint8_t tof_check_detection(void);
 
 void setup() {
-  // LED Strip Setup
-  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_1, COLOR_ORDER>(leds, NUM_LEDS_STRIP_1);
-  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_2, COLOR_ORDER>(leds, NUM_LEDS_STRIP_2);
-  // Servo Setup
-  CR_Servo_1.attach(PIN_CR_SERVO_1);
-  CR_Servo_2.attach(PIN_CR_SERVO_2);
-  Servo_1.attach(PIN_SERVO);
-  CR_Servo_1.writeMicroseconds(1500);
-  CR_Servo_2.writeMicroseconds(1500);
-  Servo_1.write(0);
   // UART Setup
   Serial.begin(115200);
   // ToF Setup
@@ -94,6 +84,16 @@ void setup() {
   }
   else Serial.println("TOF INIT");
   ToF_sensor.startContinuous();
+  // LED Strip Setup
+  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_1, COLOR_ORDER>(leds, NUM_LEDS_STRIP_1);
+  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_2, COLOR_ORDER>(leds, NUM_LEDS_STRIP_2);
+  // Servo Setup
+  CR_Servo_1.attach(PIN_CR_SERVO_1);
+  CR_Servo_2.attach(PIN_CR_SERVO_2);
+  Servo_1.attach(PIN_SERVO);
+  CR_Servo_1.writeMicroseconds(1500);
+  CR_Servo_2.writeMicroseconds(1500);
+  Servo_1.write(0);
   Serial.println(MY_TYPE);
 }
 
