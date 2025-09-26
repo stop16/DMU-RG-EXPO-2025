@@ -5,8 +5,14 @@ import threading
 # Lock 객체
 lock = threading.Lock()
 
+# 지진 효과의 활성 상태를 관리하기 위한 Event 객체
+earthquake_active = threading.Event()
+
 # 도트매트릭스 동기화 명령 전송 주기
 SYNC_INTERVAL = 10 # 단위: 분
+
+# 지진 발생 시간
+EARTHQUAKE_DURATION = 5 # 단위: 초
 
 # 도트매트릭스 상태 저장
 dot_matrix_current_state = ""
@@ -77,6 +83,26 @@ def set_earthquake(data:bool):
     elif data == False:
         port_obj[obj_8].write('0'.encode())
 
+def earthquake_sequence_thread():
+    """지진 발생 후 5초 뒤 또는 수동 중지 시 멈추는 스레드 함수
+    """
+    print("지진 발생")
+    earthquake_active.set() # 지진 활성 상태로 플래그 설정
+    set_earthquake(True)
+
+    # 기다리되, earthquake_active 이벤트가 clear되면 즉시 중단
+    stopped_manually = not earthquake_active.wait(EARTHQUAKE_DURATION)
+
+    if earthquake_active.is_set(): # 아직 이벤트가 설정되어 있다면 (시간 초과로 종료)
+        earthquake_active.clear() # 플래그 해제
+
+    set_earthquake(False)
+    
+    if stopped_manually:
+        print("지진 효과가 수동으로 중지되었습니다.")
+    else:
+        print("지진 효과가 자동으로 중지되었습니다.")
+
 # TODO: 실제 Port 이름으로 변경
 port_obj = ['/dev/tty.usbmodem11301', '/dev/tty.usbmodem114101', '/dev/tty.usbmodem114201', '/dev/tty.usbmodem114401', '/dev/tty.usbserial-11430']
 
@@ -138,10 +164,19 @@ while True:
         toggle_animation()
 
     elif a == "4":
-        set_earthquake(True)
+        if not earthquake_active.is_set():
+            # 지진 효과를 별도의 스레드에서 실행하여 메인 루프를 막지 않음
+            earthquake_thread = threading.Thread(target=earthquake_sequence_thread)
+            earthquake_thread.daemon = True
+            earthquake_thread.start()
+        else:
+            print("이미 지진 효과가 진행 중입니다.")
 
     elif a == "5":
-        set_earthquake(False)
+        if earthquake_active.is_set():
+            earthquake_active.clear()
+        else:
+            print("현재 지진 효과가 활성화되어 있지 않습니다.")
     
     elif a == "e":
         print("종료")
