@@ -4,7 +4,6 @@
  * 1. 2x CR Servo
  * 2. 1x Servo
  * 3. 2x LED Strip
- * 4. 1x ToF Sensor
 
  * Scenario
  * 1. Send '8' when received 'q' (Query for MCU type)
@@ -15,15 +14,12 @@
  * 6. Move Servo_1 down when receive '2'
  * 7. Move Servo_1 up when receive '3'
  * 8. Stop all CR_Servo when receive '0'
- * 9. Send 'o' when ToF detected < 5 cm
  */
 
 #include <FastLED.h>
 #include <Servo.h>
-#include <Wire.h>
-#include <VL53L0X.h>
 
-#define MY_TYPE 8
+#define MY_TYPE 7
 
 // Pin Configuration
 // TODO: FIX THIS PINOUT TO REAL PIN
@@ -60,30 +56,13 @@ Servo CR_Servo_1;
 Servo CR_Servo_2;
 Servo Servo_1;
 
-// ToF Related
-VL53L0X ToF_sensor;
-
-#define TOF_DISTANCE_THRESHOLD  50
-#define TOF_NOT_DETECTED        0
-#define TOF_DETECTED            1
-
 void led_set_color(uint8_t color, uint8_t brightness);
 void servo_set_position(uint8_t position);
 void cr_servo_set_state(uint8_t state);
-uint8_t tof_check_detection(void);
 
 void setup() {
   // UART Setup
   Serial.begin(115200);
-  // ToF Setup
-  Wire.begin();
-  ToF_sensor.setTimeout(500);
-  if (!ToF_sensor.init())
-  {
-    // while (1) {}
-  }
-  else Serial.println("TOF INIT");
-  ToF_sensor.startContinuous();
   // LED Strip Setup
   FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_1, COLOR_ORDER>(leds, NUM_LEDS_STRIP_1);
   FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_2, COLOR_ORDER>(leds, NUM_LEDS_STRIP_2);
@@ -98,9 +77,7 @@ void setup() {
 }
 
 void loop() {
-  uint8_t flag_tof_detected = tof_check_detection();
   char input;
-  if (flag_tof_detected) Serial.println('o');
   if (Serial.available()) {
     input = Serial.read();
     switch (input) {
@@ -201,19 +178,5 @@ void cr_servo_set_state(uint8_t state)
             break;
         default:
             break;
-    }
-}
-
-/**
- * ToF Detect function
- * Return Detected when distance < threshold
- */
-uint8_t tof_check_detection(void)
-{
-    if (ToF_sensor.readRangeContinuousMillimeters() < TOF_DISTANCE_THRESHOLD) {
-        return TOF_DETECTED;
-    }
-    else {
-        return TOF_NOT_DETECTED;
     }
 }

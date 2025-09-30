@@ -39,7 +39,7 @@
 #define LE_enable PORTB|=0x04
 #define LE_disable PORTB&=~0x04
 
-#define MY_TYPE 9
+#define MY_TYPE 8
 
 // --- Korean Character Font Data (15 columns each) ---
 // '통'

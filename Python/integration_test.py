@@ -25,11 +25,11 @@ def thread_dot_matrix_sync():
         with lock:
             current_state_snapshot = dot_matrix_current_state
         if current_state_snapshot == '통신중':
-            for i in range(len(obj_9)):
-                port_obj[obj_9[i]].write('c'.encode())
+            for i in range(len(obj_8)):
+                port_obj[obj_8[i]].write('c'.encode())
         elif current_state_snapshot == '통신불가':
-            for i in range(len(obj_9)):
-                port_obj[obj_9[i]].write('n'.encode())
+            for i in range(len(obj_8)):
+                port_obj[obj_8[i]].write('n'.encode())
 
 def set_led(color:str):
     """LED 스트립 색상 설정
@@ -43,14 +43,14 @@ def set_led(color:str):
         print(f"LED 스트립 OFF, 입력 인자: {color}")
 
     if color == 'RED':
+        port_obj[obj_6].write('r'.encode())
         port_obj[obj_7].write('r'.encode())
-        port_obj[obj_8].write('r'.encode())
     elif color == 'GREEN':
+        port_obj[obj_6].write('g'.encode())
         port_obj[obj_7].write('g'.encode())
-        port_obj[obj_8].write('g'.encode())
     else:
+        port_obj[obj_6].write('a'.encode())
         port_obj[obj_7].write('a'.encode())
-        port_obj[obj_8].write('a'.encode())
 
 def set_dot_matrix(text:str):
     """도트매트릭스 텍스트 설정
@@ -61,27 +61,27 @@ def set_dot_matrix(text:str):
     global dot_matrix_current_state
     
     if text == '통신중':
-        for i in range(len(obj_9)):
-            port_obj[obj_9[i]].write('c'.encode())
+        for i in range(len(obj_8)):
+            port_obj[obj_8[i]].write('c'.encode())
         with lock:
             dot_matrix_current_state = "통신중"
     elif text == '통신불가':
-        for i in range(len(obj_9)):
-            port_obj[obj_9[i]].write('n'.encode())
+        for i in range(len(obj_8)):
+            port_obj[obj_8[i]].write('n'.encode())
         with lock:
             dot_matrix_current_state = "통신불가"
 
 def toggle_animation():
     """도트매트릭스 애니메이션 토글
     """
-    for i in range(len(obj_9)):
-        port_obj[obj_9[i]].write('m'.encode())
+    for i in range(len(obj_8)):
+        port_obj[obj_8[i]].write('m'.encode())
 
 def set_earthquake(data:bool):
     if data == True:
-        port_obj[obj_8].write('1'.encode())
+        port_obj[obj_7].write('1'.encode())
     elif data == False:
-        port_obj[obj_8].write('0'.encode())
+        port_obj[obj_7].write('0'.encode())
 
 def earthquake_sequence_thread():
     """지진 발생 후 5초 뒤 또는 수동 중지 시 멈추는 스레드 함수
@@ -119,9 +119,10 @@ for i in range(len(port_obj)):
 
 print("Done!")
 
+obj_6 = ""
 obj_7 = ""
-obj_8 = ""
-obj_9 = []
+obj_8 = []
+obj_9 = ""
 
 print("안정화 중...")
 
@@ -136,12 +137,13 @@ for i in range(len(port_obj)):
     data = port_obj[i].read()
     time.sleep(1)
     if data == b'9':
-        obj_9.append(i)
-        print(obj_9)
+        obj_9 = i
     elif data == b'8':
-        obj_8 = i
+        obj_8.append(i)
     elif data == b'7':
         obj_7 = i
+    elif data == b'6':
+        obj_6 = i
 
 print("안정화 끝!")
 

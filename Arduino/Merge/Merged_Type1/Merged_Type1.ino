@@ -12,7 +12,7 @@
 
 #include <FastLED.h>
 
-#define MY_TYPE 7
+#define MY_TYPE 6
 
 // Pin Configuration
 // TODO: FIX THIS PINOUT TO REAL PIN
