@@ -6,7 +6,8 @@
  * Scenario
  * 1. Set Dot Matrix text '통신중' when receive 'c'
  * 2. Set Dot Matrix text '통신불가' when receive 'n'
- * 3. Toggle compact/animation mode when receive 'm'
+ * 3. Set Dot Matrix text '복구중' when receive 'v'
+ * 4. Toggle compact/animation mode when receive 'm'
  */
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
@@ -52,6 +53,10 @@
 #define CHAR_BUL 0x0000, 0x0080, 0x7eae, 0x12aa, 0x12aa, 0x12aa, 0x12ea, 0x12aa, 0x12aa, 0x7eba, 0x0080, 0x0000 //불
 // '가'
 #define CHAR_GA 0x1000, 0x1004, 0x1004, 0x1008, 0x1010, 0x1060, 0x1180, 0x1e00, 0x0000, 0x0000, 0x7ffe, 0x0080, 0x0080, 0x0000 //가
+// '복'
+#define CHAR_BOK  0x0000, 0x0000, 0x4040, 0x4040, 0x4040, 0x7e00, 0x0000, 0x0000, 0x0000, 0x0080, 0x8080, 0x8080, 0xfe80, 0x8080, 0x8000, 0x0000 //복
+// '구'
+#define CHAR_GU 0x0000, 0x0000, 0x4040, 0x4040, 0x4040, 0x7e00, 0x0000, 0x0000, 0x0000, 0x0080, 0x8080, 0x8080, 0xfe80, 0x8080, 0x8000, 0x0000 //구
 
 // --- Normal Fonts (with animation padding) ---
 const uint16_t disconnected_font[] PROGMEM = {
@@ -70,6 +75,14 @@ const uint16_t con_font[] PROGMEM = {
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
 };
 
+const uint16_t repair_font[] PROGMEM = {
+  // 공백 (16열)
+  0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+  CHAR_BOK, CHAR_GU, CHAR_JOONG,
+  // 공백 (16열)
+  0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+}
+
 // --- Compact Fonts (Minimal Spacing for static display) ---
 const uint16_t disconnected_font_compact[] PROGMEM = {
   CHAR_TONG, CHAR_SIN, CHAR_BUL, CHAR_GA,
@@ -79,11 +92,17 @@ const uint16_t con_font_compact[] PROGMEM = {
   CHAR_TONG, CHAR_SIN, CHAR_JOONG,
 };
 
+const uint16_t repair_font_compact[] PROGMEM = {
+  CHAR_BOK, CHAR_GU, CHAR_JOONG,
+}
+
 // 각 텍스트의 총 컬럼 수를 정의
 const int DISCONNECTED_COLUMNS = sizeof(disconnected_font) / sizeof(disconnected_font[0]);
 const int CONNECTED_COLUMNS = sizeof(con_font) / sizeof(con_font[0]);
+const int REPAIR_COLUMNS = sizeof(repair_font) / sizeof(repair_font[0]);
 const int DISCONNECTED_COLUMNS_COMPACT = sizeof(disconnected_font_compact) / sizeof(disconnected_font_compact[0]);
 const int CONNECTED_COLUMNS_COMPACT = sizeof(con_font_compact) / sizeof(con_font_compact[0]);
+const int REPAIR_COLUMNS_COMPACT = sizeof(repair_font_compact) / sizeof(repair_font_compact[0]);
 
 // 모든 폰트 중 가장 큰 크기를 버퍼 크기로 정의
 #define MAX_FONT_COLUMNS DISCONNECTED_COLUMNS
@@ -97,7 +116,7 @@ uint8_t g_color = 0;
 
 // NEW: 모드 관리를 위한 상태 변수
 volatile bool isCompactMode = false;
-char currentTextState = 'n'; // 'n': 통신불가, 'c': 통신중
+char currentTextState = 'n'; // 'n': 통신불가, 'c': 통신중, 'v': 복구중
 
 // 함수 프로토타입 선언
 void updateTextAndMode();
@@ -183,15 +202,19 @@ void updateTextAndMode() {
     scroll_offset = 0; // 스크롤 위치 초기화
     if (currentTextState == 'c') {
       load_font(con_font_compact, CONNECTED_COLUMNS_COMPACT);
-    } else {
+    } else if (currentTextState == 'n') {
       load_font(disconnected_font_compact, DISCONNECTED_COLUMNS_COMPACT);
+    } else {
+      load_font(repair_font_compact, REPAIR_COLUMNS_COMPACT); 
     }
   } else {
     // 일반 모드: 일반 폰트 로드 후 애니메이션 시작
     if (currentTextState == 'c') {
       load_font(con_font, CONNECTED_COLUMNS);
-    } else {
+    } else if (currentTextState == 'n') {
       load_font(disconnected_font, DISCONNECTED_COLUMNS);
+    } else {
+      load_font(repair_font, REPAIR_COLUMNS);
     }
     TIMSK2 = 0x01; // 타이머 인터럽트 활성화
   }
@@ -233,6 +256,13 @@ void loop() {
         if (currentTextState != 'c') {
             currentTextState = 'c';
             updateTextAndMode();
+        }
+        break;
+      case 'v':
+        g_color = 1;
+        if (currentTextState != 'v') {
+          currentTextState = 'v';
+          updateTextAndMode();
         }
         break;
       case 'm': // NEW: 모드 전환
