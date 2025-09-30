@@ -79,9 +79,14 @@ def toggle_animation():
 
 def set_earthquake(data:bool):
     if data == True:
-        port_obj[obj_7].write('1'.encode())
+        port_obj[obj_7].write('1'.encode()) # 지진 리니어 동작 시작
+        time.sleep(0.01) # Delay for communication
+        port_obj[obj_7].write('2'.encode()) # 건물 고정핀 내림
+        
     elif data == False:
-        port_obj[obj_7].write('0'.encode())
+        port_obj[obj_7].write('0'.encode()) # 지진 리니어 동작 중지
+        time.sleep(0.01) # Delay for communication
+        port_obj[obj_7].write('3'.encode()) # 건물 고정핀 올림
 
 def earthquake_sequence_thread():
     """지진 발생 후 5초 뒤 또는 수동 중지 시 멈추는 스레드 함수
