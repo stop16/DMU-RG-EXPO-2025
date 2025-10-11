@@ -4,7 +4,7 @@
  * 1. 2x LED Strip
 
  * Scenario
- * 1. Send '7' when received 'q' (Query for MCU type)
+ * 1. Send '6' when received 'q' (Query for MCU type)
  * 2. Turn all LED strip to RED when receive 'r'
  * 3. Turn all LED strip to GREEN when recive 'g'
  * 4. Turn all LED strip off when receive 'a'

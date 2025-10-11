@@ -6,7 +6,7 @@
  * 3. 2x LED Strip
 
  * Scenario
- * 1. Send '8' when received 'q' (Query for MCU type)
+ * 1. Send '7' when received 'q' (Query for MCU type)
  * 2. Turn all LED strip to RED when receive 'r'
  * 3. Turn all LED strip to GREEN when receive 'g'
  * 4. Start CR_Servo_1 when receive '1'

@@ -4,10 +4,11 @@
  * 1. 1x Dot Matrix
  *
  * Scenario
- * 1. Set Dot Matrix text '통신중' when receive 'c'
- * 2. Set Dot Matrix text '통신불가' when receive 'n'
- * 3. Set Dot Matrix text '복구중' when receive 'v'
- * 4. Toggle compact/animation mode when receive 'm'
+ * 1. Send '8' when received 'q' (Query for MCU type)
+ * 2. Set Dot Matrix text '통신중' when receive 'c'
+ * 3. Set Dot Matrix text '통신불가' when receive 'n'
+ * 4. Set Dot Matrix text '복구중' when receive 'v'
+ * 5. Toggle compact/animation mode when receive 'm'
  */
 #include <avr/pgmspace.h>
 #include <avr/interrupt.h>
@@ -81,7 +82,7 @@ const uint16_t repair_font[] PROGMEM = {
   CHAR_BOK, CHAR_GU, CHAR_JOONG,
   // 공백 (16열)
   0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
-}
+};
 
 // --- Compact Fonts (Minimal Spacing for static display) ---
 const uint16_t disconnected_font_compact[] PROGMEM = {
@@ -94,7 +95,7 @@ const uint16_t con_font_compact[] PROGMEM = {
 
 const uint16_t repair_font_compact[] PROGMEM = {
   CHAR_BOK, CHAR_GU, CHAR_JOONG,
-}
+};
 
 // 각 텍스트의 총 컬럼 수를 정의
 const int DISCONNECTED_COLUMNS = sizeof(disconnected_font) / sizeof(disconnected_font[0]);

@@ -1,5 +1,5 @@
 /**
- * 2025 RG EXPO Code (Merge ver) Type 2
+ * 2025 RG EXPO Code (Merge ver) Type 4
  * Components
  * 1. 1x ToF Sensor
 
