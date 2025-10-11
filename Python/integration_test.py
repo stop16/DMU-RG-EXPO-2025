@@ -56,7 +56,7 @@ def set_dot_matrix(text:str):
     """도트매트릭스 텍스트 설정
 
     Args:
-        text (str): 통신중, 통신불가 중 하나 입력하면 설정됨
+        text (str): 통신중, 복구중, 통신불가 중 하나 입력하면 설정됨
     """
     global dot_matrix_current_state
     
@@ -65,6 +65,11 @@ def set_dot_matrix(text:str):
             port_obj[obj_8[i]].write('c'.encode())
         with lock:
             dot_matrix_current_state = "통신중"
+    elif text == '복구중':
+        for i in range(len(obj_8)):
+            port_obj[obj_8[i]].write('v'.encode())
+        with lock:
+            dot_matrix_current_state = "복구중"
     elif text == '통신불가':
         for i in range(len(obj_8)):
             port_obj[obj_8[i]].write('n'.encode())
@@ -165,12 +170,16 @@ while True:
 
     elif a == "2":
         set_led('RED')
-        set_dot_matrix('통신불가')
+        set_dot_matrix("복구중")
     
     elif a == "3":
+        set_led('RED')
+        set_dot_matrix('통신불가')
+    
+    elif a == "4":
         toggle_animation()
 
-    elif a == "4":
+    elif a == "5":
         if not earthquake_active.is_set():
             # 지진 효과를 별도의 스레드에서 실행하여 메인 루프를 막지 않음
             earthquake_thread = threading.Thread(target=earthquake_sequence_thread)
@@ -179,7 +188,7 @@ while True:
         else:
             print("이미 지진 효과가 진행 중입니다.")
 
-    elif a == "5":
+    elif a == "6":
         if earthquake_active.is_set():
             earthquake_active.clear()
         else:
