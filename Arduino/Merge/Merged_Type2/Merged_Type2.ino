@@ -15,6 +15,11 @@
  * 7. Move Servo_1 up when receive '3'
  * 8. Stop all CR_Servo when receive '0'
  */
+* 
+* 새로운 기능:
+* - 지진 시작 시 자동으로 서보 DOWN
+* - 지진 중지 시 자동으로 서보 UP
+*/
 
 #include <FastLED.h>
 #include <Servo.h>
@@ -22,39 +27,43 @@
 #define MY_TYPE 7
 
 // Pin Configuration
-// TODO: FIX THIS PINOUT TO REAL PIN
-#define DUMMY_PIN   999
+#define DUMMY_PIN 999
 #define PIN_LED_STRIP_1 9
 #define PIN_LED_STRIP_2 10
-#define PIN_CR_SERVO_1  3
-#define PIN_CR_SERVO_2  5
-#define PIN_SERVO       6
+#define PIN_CR_SERVO_1 11
+#define PIN_CR_SERVO_2 5
+#define PIN_SERVO 3
 
 // LED Strip Related
-#define NUM_LEDS_STRIP_1        140     // LED 개수
-#define NUM_LEDS_STRIP_2        140     // LED 개수
-#define NUM_LEDS_TOTAL          (NUM_LEDS_STRIP_1 + NUM_LEDS_STRIP_2)
-
-#define LED_TYPE WS2812B   // LED 타입
-#define COLOR_ORDER GRB    // 색상 순서
-
-#define LED_DEFAULT_BRIGHTNESS  100
-
-#define LED_COLOR_OFF           0
-#define LED_COLOR_RED           1
-#define LED_COLOR_GREEN         2
+#define NUM_LEDS_STRIP_1 140
+#define NUM_LEDS_STRIP_2 140
+#define NUM_LEDS_TOTAL (NUM_LEDS_STRIP_1 + NUM_LEDS_STRIP_2)
+#define LED_TYPE WS2812B
+#define COLOR_ORDER GRB
+#define LED_DEFAULT_BRIGHTNESS 100
+#define LED_COLOR_OFF 0
+#define LED_COLOR_RED 1
+#define LED_COLOR_GREEN 2
 
 CRGB leds[NUM_LEDS_TOTAL];
 
 // Servo Related
-#define CR_SERVO_OFF            0
-#define CR_SERVO_ON             1
-#define SERVO_DOWN              0
-#define SERVO_UP                1
-#define SERVO_STOP              2
+#define CR_SERVO_OFF 0
+#define CR_SERVO_ON 1
+#define SERVO_DOWN 0
+#define SERVO_UP 1
+#define SERVO_STOP 2
+
 Servo CR_Servo_1;
 Servo CR_Servo_2;
 Servo Servo_1;
+
+// Communication Timeout & Earthquake Control
+unsigned long lastCommTime = 0;
+const unsigned long COMM_TIMEOUT = 5000; // 5초
+bool earthquakeActive = false;
+bool recoveryComplete = false;
+bool commStarted = false;  // 첫 통신 수신 여부
 
 void led_set_color(uint8_t color, uint8_t brightness);
 void servo_set_position(uint8_t position);
@@ -63,35 +72,57 @@ void cr_servo_set_state(uint8_t state);
 void setup() {
   // UART Setup
   Serial.begin(115200);
+  
   // LED Strip Setup
   FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_1, COLOR_ORDER>(leds, NUM_LEDS_STRIP_1);
-  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_2, COLOR_ORDER>(leds, NUM_LEDS_STRIP_2);
+  FastLED.addLeds<LED_TYPE, PIN_LED_STRIP_2, COLOR_ORDER>(leds + NUM_LEDS_STRIP_1, NUM_LEDS_STRIP_2);
+  
   // Servo Setup
   CR_Servo_1.attach(PIN_CR_SERVO_1);
   CR_Servo_2.attach(PIN_CR_SERVO_2);
   Servo_1.attach(PIN_SERVO);
+  
   CR_Servo_1.writeMicroseconds(1500);
   CR_Servo_2.writeMicroseconds(1500);
   Servo_1.write(0);
+  
   Serial.println(MY_TYPE);
 }
 
 void loop() {
   char input;
+  
+  // 시리얼 통신 수신 처리
   if (Serial.available()) {
     input = Serial.read();
+    lastCommTime = millis();
+    commStarted = true;
+    
     switch (input) {
-      case '0': // CR_SERVO OFF
+      case '0': // CR_SERVO OFF (Recovery Complete)
+        earthquakeActive = false;
+        recoveryComplete = true;
         cr_servo_set_state(CR_SERVO_OFF);
-        break; 
-      case '1': // CR_SERVO ON
-        cr_servo_set_state(CR_SERVO_ON);
+        servo_set_position(SERVO_UP);  //  서보 UP 추가
         break;
-      case '2': // SERVO Down
+      case '1': // CR_SERVO ON (Earthquake Start)
+        earthquakeActive = true;
+        recoveryComplete = false;
+        cr_servo_set_state(CR_SERVO_ON);
+        servo_set_position(SERVO_DOWN);  //  서보 DOWN 추가
+        break;
+      case '2': // SERVO Down (Manual)
         servo_set_position(SERVO_DOWN);
         break;
-      case '3': // SERVO Up
+      case '3': // SERVO Up (Manual)
         servo_set_position(SERVO_UP);
+        break;
+      case 's': // System Reset
+        earthquakeActive = false;
+        recoveryComplete = false;
+        commStarted = false;
+        cr_servo_set_state(CR_SERVO_OFF);
+        servo_set_position(SERVO_UP);  // ⭐ 서보 UP 추가
         break;
       case 'r': // LED Strip to RED
         led_set_color(LED_COLOR_RED, LED_DEFAULT_BRIGHTNESS);
@@ -108,6 +139,13 @@ void loop() {
       default:
         break;
     }
+  }
+  
+  // 통신 끊김 감지 -> 첫 통신 수신 후 && 복구 완료 전이면 지진 자동 시작
+  if (commStarted && !recoveryComplete && !earthquakeActive && (millis() - lastCommTime > COMM_TIMEOUT)) {
+    earthquakeActive = true;
+    cr_servo_set_state(CR_SERVO_ON);
+    servo_set_position(SERVO_DOWN);  // ⭐ 서보 DOWN 추가
   }
 }
 
@@ -144,39 +182,36 @@ void led_set_color(uint8_t color, uint8_t brightness)
  */
 void servo_set_position(uint8_t position)
 {
-    switch(position) {
-        case SERVO_DOWN:
-            Servo_1.write(170);
-            break;
-        case SERVO_UP:
-            Servo_1.write(20);
-            break;
-        case SERVO_STOP:
-            Servo_1.write(90);
-            break;
-        default:
-            break;
-    }
-
+  switch(position) {
+    case SERVO_DOWN:
+      Servo_1.write(170);
+      break;
+    case SERVO_UP:
+      Servo_1.write(20);
+      break;
+    case SERVO_STOP:
+      Servo_1.write(90);
+      break;
+    default:
+      break;
+  }
 }
 
 /**
  * CR Servo control function
- * ON -> Start earthquake
- * OFF -> Stop earthquake
  */
 void cr_servo_set_state(uint8_t state)
 {
-    switch(state) {
-        case CR_SERVO_ON:
-            CR_Servo_1.writeMicroseconds(2218.5);
-            CR_Servo_2.writeMicroseconds(3000);
-            break;
-        case CR_SERVO_OFF:
-            CR_Servo_1.writeMicroseconds(1500);
-            CR_Servo_2.writeMicroseconds(1500);
-            break;
-        default:
-            break;
-    }
+  switch(state) {
+    case CR_SERVO_ON:
+      CR_Servo_1.writeMicroseconds(2218.5);
+      CR_Servo_2.writeMicroseconds(3000);
+      break;
+    case CR_SERVO_OFF:
+      CR_Servo_1.writeMicroseconds(1500);
+      CR_Servo_2.writeMicroseconds(1500);
+      break;
+    default:
+      break;
+  }
 }
