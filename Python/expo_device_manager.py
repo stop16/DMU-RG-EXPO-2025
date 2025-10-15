@@ -183,6 +183,7 @@ class DeviceManager:
         except Exception as e:
             print(f"지진 시작 오류: {e}")
 
+
     def stop_earthquake(self):
         """지진 효과 중지 (CR Servo OFF, type 7)."""
         if self.obj_7 is None:
@@ -214,34 +215,36 @@ class DeviceManager:
             time.sleep(0.1)
 
     def demo_thread(self):
-        """데모 시퀀스 스레드."""
-        assert self.obj_9 is not None, "센서(Type 9) 포트 미할당"
+        """데모 시퀀스 스레드 수정 (시나리오 순서 반영)."""
+        assert self.obj_9 is not None,  "센서(Type 9) 포트 미할당"
 
-        # 1단계: 통신 불가 상태로 변경
-        print("1단계: 통신 불가 상태 시작")
+        # 1단계: 지진 발생 (약 3.5초간)
+        print("1단계: 지진 발생")
+        time.sleep(3.5)  # 시작 후 지진 시작 딜레이 (3.5초) 
+        self.start_earthquake()  # 지진 시작 + 서보 DOWN
+         
+        # 2단계: 통신 단절 표시
+        time.sleep(2)  # 통신 단절 변경 딜레이 (2초)
+        print("2단계: 통신 단절")
         self.set_dot_matrix("통신불가")
         self.set_led("RED")
-        
-        # 통신 끊김 시뮬레이션: 일정 시간 대기하여 Arduino가 타임아웃 감지하도록 함
-        print("통신 끊김 시뮬레이션 중... (6초 대기)")
-        time.sleep(6)  # 5초 타임아웃 + 여유
-        
-        print("지진이 자동으로 시작되었을 것으로 예상")
 
-        # 2단계: ToF 센서 트리거 대기
-        print("2단계: ToF 센서 트리거 대기")
+        # 3단계: 지진 중지
+        print("3단계: 통신불가 상태 유지 및 5초뒤 지진 중지 (3.5초)")
+        time.sleep(3.5) #중지 전 3.5초 딜레이
+        self.stop_earthquake()  # 지진 중지 + 서보 UP
+        
+        # 4단계: ToF 센서 트리거 대기 (RC 카 도착)
+        print("4단계: RC 카 도착 대기")
         self.wait_for_tof_trigger()
 
-        # 3단계: 복구 중 상태로 변경
-        print("3단계: 복구 중 상태로 전환")
+        # 5단계: 통신 복구 중
+        print("5단계: 통신 복구 중")
         self.set_dot_matrix("복구중")
-        
-        # 4단계: 지진 중지 명령 전송
-        self.stop_earthquake()
 
-        # 5단계: 복구 완료
-        time.sleep(3)
-        print("4단계: 복구 완료, 통신 중 상태로 복귀")
+        # 6단계: 복구 완료 (5초 대기) 통신중 전환은 몇초로 할까 
+        time.sleep(5)
+        print("6단계: 통신 복구 완료")
         self.set_dot_matrix("통신중")
         self.set_led("GREEN")
 

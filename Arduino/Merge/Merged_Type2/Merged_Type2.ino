@@ -15,12 +15,7 @@
  * 7. Move Servo_1 up when receive '3'
  * 8. Stop all CR_Servo when receive '0'
  */
-* 
-* 새로운 기능:
-* - 지진 시작 시 자동으로 서보 DOWN
-* - 지진 중지 시 자동으로 서보 UP
-*/
-
+ 
 #include <FastLED.h>
 #include <Servo.h>
 
@@ -92,60 +87,43 @@ void setup() {
 void loop() {
   char input;
   
-  // 시리얼 통신 수신 처리
   if (Serial.available()) {
     input = Serial.read();
-    lastCommTime = millis();
-    commStarted = true;
     
     switch (input) {
-      case '0': // CR_SERVO OFF (Recovery Complete)
-        earthquakeActive = false;
-        recoveryComplete = true;
+      case '0': // CR_SERVO OFF
         cr_servo_set_state(CR_SERVO_OFF);
-        servo_set_position(SERVO_UP);  //  서보 UP 추가
+        servo_set_position(SERVO_UP);
         break;
-      case '1': // CR_SERVO ON (Earthquake Start)
-        earthquakeActive = true;
-        recoveryComplete = false;
+      case '1': // CR_SERVO ON
         cr_servo_set_state(CR_SERVO_ON);
-        servo_set_position(SERVO_DOWN);  //  서보 DOWN 추가
-        break;
-      case '2': // SERVO Down (Manual)
         servo_set_position(SERVO_DOWN);
         break;
-      case '3': // SERVO Up (Manual)
+      case '2': // SERVO Down
+        servo_set_position(SERVO_DOWN);
+        break;
+      case '3': // SERVO Up
         servo_set_position(SERVO_UP);
         break;
       case 's': // System Reset
-        earthquakeActive = false;
-        recoveryComplete = false;
-        commStarted = false;
         cr_servo_set_state(CR_SERVO_OFF);
-        servo_set_position(SERVO_UP);  // ⭐ 서보 UP 추가
+        servo_set_position(SERVO_UP);
         break;
-      case 'r': // LED Strip to RED
+      case 'r': // LED RED
         led_set_color(LED_COLOR_RED, LED_DEFAULT_BRIGHTNESS);
         break;
-      case 'g': // LED Strip to Green
+      case 'g': // LED GREEN
         led_set_color(LED_COLOR_GREEN, LED_DEFAULT_BRIGHTNESS);
         break;
-      case 'a': // LED Strip off
+      case 'a': // LED OFF
         led_set_color(LED_COLOR_OFF, LED_DEFAULT_BRIGHTNESS);
         break;
-      case 'q': // Type query -> Send type number
+      case 'q': // Type query
         Serial.println(MY_TYPE);
         break;
       default:
         break;
     }
-  }
-  
-  // 통신 끊김 감지 -> 첫 통신 수신 후 && 복구 완료 전이면 지진 자동 시작
-  if (commStarted && !recoveryComplete && !earthquakeActive && (millis() - lastCommTime > COMM_TIMEOUT)) {
-    earthquakeActive = true;
-    cr_servo_set_state(CR_SERVO_ON);
-    servo_set_position(SERVO_DOWN);  // ⭐ 서보 DOWN 추가
   }
 }
 
