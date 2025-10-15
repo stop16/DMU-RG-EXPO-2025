@@ -218,7 +218,7 @@ class DeviceManager:
         """데모 시퀀스 스레드 수정 (시나리오 순서 반영)."""
         assert self.obj_9 is not None,  "센서(Type 9) 포트 미할당"
 
-        # 1단계: 지진 발생 (약 5초간)
+        # 1단계: 지진 발생 (약 3.5초간)
         print("1단계: 지진 발생")
         time.sleep(3.5)  # 시작 후 지진 시작 딜레이 (3.5초) 
         self.start_earthquake()  # 지진 시작 + 서보 DOWN
@@ -231,7 +231,7 @@ class DeviceManager:
 
         # 3단계: 지진 중지
         print("3단계: 통신불가 상태 유지 및 5초뒤 지진 중지 (3.5초)")
-        time.sleep(3.5) #중지 전 5초 딜레이
+        time.sleep(3.5) #중지 전 3.5초 딜레이
         self.stop_earthquake()  # 지진 중지 + 서보 UP
         
         # 4단계: ToF 센서 트리거 대기 (RC 카 도착)
@@ -239,12 +239,12 @@ class DeviceManager:
         self.wait_for_tof_trigger()
 
         # 5단계: 통신 복구 중
-        print("4단계: 통신 복구 중")
+        print("5단계: 통신 복구 중")
         self.set_dot_matrix("복구중")
 
         # 6단계: 복구 완료 (5초 대기) 통신중 전환은 몇초로 할까 
         time.sleep(5)
-        print("5단계: 통신 복구 완료")
+        print("6단계: 통신 복구 완료")
         self.set_dot_matrix("통신중")
         self.set_led("GREEN")
 
