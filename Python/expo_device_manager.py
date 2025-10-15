@@ -224,7 +224,7 @@ class DeviceManager:
         self.start_earthquake()  # 지진 시작 + 서보 DOWN
          
         # 2단계: 통신 단절 표시
-        time.sleep(2)  # 통신 단절 변경 딜레이 (3.5초)
+        time.sleep(2)  # 통신 단절 변경 딜레이 (2초)
         print("2단계: 통신 단절")
         self.set_dot_matrix("통신불가")
         self.set_led("RED")
