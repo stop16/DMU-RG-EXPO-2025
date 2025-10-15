@@ -235,7 +235,7 @@ class DeviceManager:
         self.stop_earthquake()  # 지진 중지 + 서보 UP
         
         # 4단계: ToF 센서 트리거 대기 (RC 카 도착)
-        print("3단계: RC 카 도착 대기")
+        print("4단계: RC 카 도착 대기")
         self.wait_for_tof_trigger()
 
         # 5단계: 통신 복구 중
