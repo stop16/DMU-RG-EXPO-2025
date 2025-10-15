@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 import time
-
 import serial
 
 DEFAULT_SERIAL_BAUDRATE = 115200
@@ -24,13 +23,10 @@ class DeviceManager:
         self.obj_7: int | None = None
         self.obj_8: list[int] = []
         self.obj_9: int | None = None
-
         self.dot_matrix_current_state = ""
-
         self.lock = threading.Lock()
         # 지진 루틴이 진행 중인지 공유하기 위한 이벤트
         self.earthquake_active = threading.Event()
-
         self.port_obj: list[serial.Serial | None] = []
 
     def connect(self, ports: list[str]):
@@ -44,203 +40,215 @@ class DeviceManager:
                     timeout=DEFAULT_SERIAL_TIMEOUT,
                     write_timeout=DEFAULT_SERIAL_WRITE_TIMEOUT,
                 )
-                # 최신 PySerial은 생성 시 곧바로 열릴 수 있으므로 다시 확인
-                if not ser.is_open:
-                    ser.open()
                 self.port_obj[i] = ser
-        except Exception:
-            for serial_obj in self.port_obj:
-                try:
-                    if serial_obj and serial_obj.is_open:
-                        serial_obj.close()
-                except Exception:
-                    pass
+        except Exception as e:
+            print(f"포트 연결 중 오류: {e}")
             raise
 
-    def disconnect(self):
-        """모든 장치와의 연결을 해제."""
-        for i in range(len(self.port_obj)):
-            if self.port_obj[i] and self.port_obj[i].is_open:
-                self.port_obj[i].close()
-
     def activate(self):
-        """장치마다 고유 코드를 읽어서 역할을 매핑."""
-        time.sleep(3)
-        for i in range(len(self.port_obj)):
-            if not self.port_obj[i]:
+        """연결된 장치에 'q' 신호를 보내 타입을 수신하고 매핑."""
+        print("장치 안정화 중...")
+        time.sleep(5)
+
+        for i, ser in enumerate(self.port_obj):
+            if ser is None:
                 continue
+            try:
+                ser.write(b'q')
+                data = ser.read(1)
+                time.sleep(1)
 
-            self.port_obj[i].write("q".encode())
-            data = self.port_obj[i].read()
-            time.sleep(1)
-            if data == b"9":
-                self.obj_9 = i
-            elif data == b"8":
-                self.obj_8.append(i)
-            elif data == b"7":
-                self.obj_7 = i
-            elif data == b"6":
-                self.obj_6 = i
+                if data == b'6':
+                    self.obj_6 = i
+                elif data == b'7':
+                    self.obj_7 = i
+                elif data == b'8':
+                    self.obj_8.append(i)
+                elif data == b'9':
+                    self.obj_9 = i
+            except Exception as e:
+                print(f"장치 활성화 오류 (포트 {i}): {e}")
 
-        # 도트 매트릭스 내용이 바뀌었는지 주기적으로 확인
-        self.dot_sync_thread = threading.Thread(target=self.thread_dot_matrix_sync)
-        self.dot_sync_thread.daemon = True  # 데몬 스레드로 설정해 종료 시 자동 정리
-        self.dot_sync_thread.start()
+        print(f"장치 매핑 완료: obj_6={self.obj_6}, obj_7={self.obj_7}, "
+              f"obj_8={self.obj_8}, obj_9={self.obj_9}")
 
-    # --- LED Strip related functions
-    def set_led(self, color: str):
-        """LED 스트립 상태를 세팅한다.
+    def disconnect(self):
+        """모든 시리얼 포트 닫기 전 시스템 리셋."""
+        print("장치 종료 준비 중...")
+        
+        # 지진 장치 리셋 (Type 7)
+        if self.obj_7 is not None and self.port_obj[self.obj_7]:
+            try:
+                self.port_obj[self.obj_7].write(b's')
+                time.sleep(0.1)  # 명령 전송 대기
+                print("지진 장치 리셋 완료")
+            except Exception as e:
+                print(f"지진 장치 리셋 오류: {e}")
+        
+        # 모든 포트 닫기
+        for ser in self.port_obj:
+            if ser and ser.is_open:
+                try:
+                    ser.close()
+                except Exception as e:
+                    print(f"포트 닫기 오류: {e}")
+        
+        print("모든 포트 연결 해제됨")
 
-        Args:
-            color (str): RED(빨강), GREEN(초록), OFF(끄기) 중 하나.
-        """
-        assert self.obj_6 is not None and self.obj_7 is not None, "LED 스트립 미할당"
+    def reset_environment(self):
+        """초기 상태: LED 스트립 GREEN, Dot Matrix '통신중'."""
+        print("환경 초기화 중...")
+        self.set_dot_matrix("통신중")
+        self.set_led("GREEN")
+        self.reset_earthquake_system()  # 's' 명령 사용
+        print("환경 초기화 완료")
 
-        if color in ["RED", "GREEN"]:
-            print(f"LED 스트립 상태 {color}로 설정")
-        else:
-            print(f"LED 스트립 OFF, 입력 문자: {color}")
+    def reset_earthquake_system(self):
+        """시스템 리셋: 지진 중지 + 복구 플래그 해제 ('s' 명령)."""
+        if self.obj_7 is None:
+            return
 
-        if color == "RED":  # 빨강
-            self.port_obj[self.obj_6].write("r".encode())
-            self.port_obj[self.obj_7].write("r".encode())
-        elif color == "GREEN":  # 초록
-            self.port_obj[self.obj_6].write("g".encode())
-            self.port_obj[self.obj_7].write("g".encode())
-        else:  # 끄기
-            self.port_obj[self.obj_6].write("a".encode())
-            self.port_obj[self.obj_7].write("a".encode())
-
-    # --- Dot Matrix related functions
-    def thread_dot_matrix_sync(self):
-        """도트 매트릭스 표시 내용을 주기적으로 동기화."""
-        while True:
-            time.sleep(60 * DEFAULT_SYNC_INTERVAL)
-            with self.lock:
-                current_state_snapshot = self.dot_matrix_current_state
-
-            if current_state_snapshot == "통신중":
-                for i in range(len(self.obj_8)):
-                    self.port_obj[self.obj_8[i]].write("c".encode())
-            elif current_state_snapshot == "통신불가":
-                for i in range(len(self.obj_8)):
-                    self.port_obj[self.obj_8[i]].write("n".encode())
+        try:
+            self.port_obj[self.obj_7].write(b's')  # System Reset 명령
+            self.earthquake_active.clear()
+            print("지진 시스템 리셋 (복구 플래그 해제)")
+        except Exception as e:
+            print(f"시스템 리셋 오류: {e}")
 
     def set_dot_matrix(self, text: str):
-        """도트매트릭스 메시지를 변경한다.
+        """Dot Matrix(type 8)에 텍스트 표시."""
+        if not self.obj_8:
+            print("Dot Matrix 장치가 할당되지 않음")
+            return
 
-        Args:
-            text (str): '통신중', '복구중', '통신불가' 중 하나.
-        """
-        assert self.obj_8, "도트매트릭스 포트 미할당"
+        command_map = {
+            "통신중": b'c',
+            "통신불가": b'n',
+            "복구중": b'v',
+        }
 
-        if text == "통신중":
-            for i in range(len(self.obj_8)):
-                self.port_obj[self.obj_8[i]].write("c".encode())
-            with self.lock:
-                self.dot_matrix_current_state = "통신중"
-        elif text == "복구중":
-            for i in range(len(self.obj_8)):
-                self.port_obj[self.obj_8[i]].write("v".encode())
-            with self.lock:
-                self.dot_matrix_current_state = "복구중"
-        elif text == "통신불가":
-            for i in range(len(self.obj_8)):
-                self.port_obj[self.obj_8[i]].write("n".encode())
-            with self.lock:
-                self.dot_matrix_current_state = "통신불가"
+        cmd = command_map.get(text)
+        if cmd is None:
+            print(f"알 수 없는 Dot Matrix 텍스트: {text}")
+            return
 
-    def toggle_animation(self):
-        """도트매트릭스 애니메이션을 토글."""
-        for i in range(len(self.obj_8)):
-            self.port_obj[self.obj_8[i]].write("m".encode())
+        with self.lock:
+            for idx in self.obj_8:
+                if self.port_obj[idx]:
+                    try:
+                        self.port_obj[idx].write(cmd)
+                    except Exception as e:
+                        print(f"Dot Matrix 명령 전송 오류 (포트 {idx}): {e}")
 
-    # --- Earthquake related functions
-    def set_earthquake(self, data: bool):
-        """지진 장치에 온/오프 명령을 전달."""
-        if data is True:
-            self.port_obj[self.obj_7].write("1".encode())  # 지진 리니어 작동 시작
-            time.sleep(0.01)  # 통신 안정화를 위한 딜레이
-            self.port_obj[self.obj_7].write("2".encode())  # 건물 고정대 흔들림
-        elif data is False:
-            self.port_obj[self.obj_7].write("0".encode())  # 지진 리니어 작동 중지
-            time.sleep(0.01)  # 통신 안정화를 위한 딜레이
-            self.port_obj[self.obj_7].write("3".encode())  # 건물 고정대 안정
+        self.dot_matrix_current_state = text
+        print(f"Dot Matrix 상태 변경: {text}")
 
-    def earthquake_sequence_thread(self):
-        """지진 효과를 주기적으로 실행하고 자동 해제."""
-        print("지진 발생")
-        self.earthquake_active.set()  # 지진 활성 상태 공유
-        self.set_earthquake(True)
+    def set_led(self, color: str):
+        """LED 스트립(type 6, 7)의 색상 설정."""
+        color_map = {
+            "GREEN": b'g',
+            "RED": b'r',
+        }
 
-        # 이벤트가 해제되면 즉시 멈추고, 아니면 기본 지속 시간만큼 유지
-        stopped_manually = not self.earthquake_active.wait(DEFAULT_EARTHQUAKE_DURATION)
+        cmd = color_map.get(color.upper())
+        if cmd is None:
+            print(f"알 수 없는 LED 색상: {color}")
+            return
 
-        if self.earthquake_active.is_set():  # 아직 이벤트가 설정되어 있다면(시간 초과 종료)
-            self.earthquake_active.clear()  # 플래그 해제
+        indices = []
+        if self.obj_6 is not None:
+            indices.append(self.obj_6)
+        if self.obj_7 is not None:
+            indices.append(self.obj_7)
 
-        self.set_earthquake(False)
+        for idx in indices:
+            if self.port_obj[idx]:
+                try:
+                    self.port_obj[idx].write(cmd)
+                except Exception as e:
+                    print(f"LED 색상 명령 전송 오류 (포트 {idx}): {e}")
 
-        if stopped_manually:
-            print("지진 효과가 수동으로 중지되었습니다.")
-        else:
-            print("지진 효과가 자동으로 중지되었습니다.")
+        print(f"LED 스트립 상태 변경: {color}")
 
     def start_earthquake(self):
-        """지진 효과를 별도 스레드에서 실행."""
-        if not self.earthquake_active.is_set():
-            # 지진 효과는 별도 스레드에서 실행해 메인 루프를 막지 않음
-            self.earthquake_thread = threading.Thread(target=self.earthquake_sequence_thread)
-            self.earthquake_thread.daemon = True
-            self.earthquake_thread.start()
-        else:
-            print("이미 지진 효과가 진행 중입니다.")
+        """지진 효과 시작 (CR Servo ON, type 7)."""
+        if self.obj_7 is None:
+            print("지진 장치(Type 7)가 할당되지 않음")
+            return
+
+        try:
+            self.port_obj[self.obj_7].write(b'1')
+            self.earthquake_active.set()
+            print("지진 발생")
+        except Exception as e:
+            print(f"지진 시작 오류: {e}")
 
     def stop_earthquake(self):
-        """진행 중인 지진 효과 중지."""
-        if self.earthquake_active.is_set():
+        """지진 효과 중지 (CR Servo OFF, type 7)."""
+        if self.obj_7 is None:
+            return
+
+        try:
+            self.port_obj[self.obj_7].write(b'0')
             self.earthquake_active.clear()
-        else:
-            print("현재 지진 효과가 활성화되어 있지 않습니다.")
+            print("지진 효과 중지 (복구 완료)")
+        except Exception as e:
+            print(f"지진 중지 오류: {e}")
 
-    # --- Environment related functions
-    def reset_environment(self):
-        """전체 환경을 초기 상태로 복원."""
-        self.set_led("GREEN")
-        self.set_dot_matrix("통신중")
-        self.set_earthquake(False)
+    def wait_for_tof_trigger(self):
+        """ToF 센서(type 9)가 'o' 신호를 보낼 때까지 대기."""
+        if self.obj_9 is None:
+            print("ToF 센서(Type 9)가 할당되지 않음")
+            return
 
-    # --- Demo related functions
-    def start_demo_sequence(self):
-        """전체 데모 시퀀스를 새 스레드에서 실행."""
-        self.demonstration_thread = threading.Thread(target=self.demo_thread)
-        self.demonstration_thread.start()
-
-    def stop_demo_sequence(self):
-        """데모 스레드 종료를 대기."""
-        self.demonstration_thread.join()
+        print("ToF 센서 트리거 대기 중...")
+        while True:
+            try:
+                data = self.port_obj[self.obj_9].read(1)
+                if data == b'o':
+                    print("ToF 센서 트리거 감지!")
+                    return
+            except Exception as e:
+                print(f"ToF 센서 읽기 오류: {e}")
+                time.sleep(0.1)
+            time.sleep(0.1)
 
     def demo_thread(self):
-        """데모 시퀀스 본체."""
-        assert self.obj_9 is not None, "센서(Q) 포트 미할당"
+        """데모 시퀀스 스레드."""
+        assert self.obj_9 is not None, "센서(Type 9) 포트 미할당"
 
-        self.start_earthquake()
-        while True:
-            # 지진이 끝날 때까지 대기
-            if not self.earthquake_active.is_set():
-                time.sleep(0.2)
-                break
+        # 1단계: 통신 불가 상태로 변경
+        print("1단계: 통신 불가 상태 시작")
         self.set_dot_matrix("통신불가")
         self.set_led("RED")
+        
+        # 통신 끊김 시뮬레이션: 일정 시간 대기하여 Arduino가 타임아웃 감지하도록 함
+        print("통신 끊김 시뮬레이션 중... (6초 대기)")
+        time.sleep(6)  # 5초 타임아웃 + 여유
+        
+        print("지진이 자동으로 시작되었을 것으로 예상")
 
-        # RC Car start condition
-        while True:
-            data = self.port_obj[self.obj_9].read()
-            if data == b"o":  # Something detected
-                # (Optional) Filtering logic here
-                break
+        # 2단계: ToF 센서 트리거 대기
+        print("2단계: ToF 센서 트리거 대기")
+        self.wait_for_tof_trigger()
 
+        # 3단계: 복구 중 상태로 변경
+        print("3단계: 복구 중 상태로 전환")
         self.set_dot_matrix("복구중")
-        time.sleep(3)  # Wait 3 seconds
+        
+        # 4단계: 지진 중지 명령 전송
+        self.stop_earthquake()
+
+        # 5단계: 복구 완료
+        time.sleep(3)
+        print("4단계: 복구 완료, 통신 중 상태로 복귀")
         self.set_dot_matrix("통신중")
         self.set_led("GREEN")
+
+        print("데모 시퀀스 완료")
+
+    def start_demo_sequence(self):
+        """데모 시퀀스를 별도 스레드로 시작."""
+        thread = threading.Thread(target=self.demo_thread, daemon=True)
+        thread.start()
+        print("데모 시퀀스 스레드 시작됨")
