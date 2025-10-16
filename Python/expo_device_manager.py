@@ -44,11 +44,22 @@ class DeviceManager:
         except Exception as e:
             print(f"포트 연결 중 오류: {e}")
             raise
-
+    ##추가 구문
     def activate(self):
         """연결된 장치에 'q' 신호를 보내 타입을 수신하고 매핑."""
         print("장치 안정화 중...")
-        time.sleep(5)
+
+        time.sleep(2) # 최소 대기
+
+    # 모든 Dot Matrix에 '통신중' 표시
+    for i, ser in enumerate(self.port_obj):
+        if ser:
+            try:
+                ser.write(b'c')  # '통신중' 명령
+            except:
+                pass
+    
+        time.sleep(3) # 나머지 안정화
 
         for i, ser in enumerate(self.port_obj):
             if ser is None:
