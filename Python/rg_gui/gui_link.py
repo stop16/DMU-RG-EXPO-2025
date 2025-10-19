@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
             self.device_manager.reset_environment()
             self.connection_status = True
         else:
+            self.connection_status = False
             self.device_manager.reset_environment()
             self.device_manager.disconnect()
 
