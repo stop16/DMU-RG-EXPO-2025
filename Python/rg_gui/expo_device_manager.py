@@ -1,10 +1,9 @@
 """Expo 데모 장치를 제어하는 관리자 모듈."""
-
-from __future__ import annotations
-
 import threading
 import time
 import serial
+
+from PySide6.QtCore import Slot, Signal, QObject
 
 DEFAULT_SERIAL_BAUDRATE = 115200
 DEFAULT_SERIAL_TIMEOUT = 1
@@ -15,10 +14,13 @@ DEFAULT_SYNC_INTERVAL = 10  # Minutes
 DEFAULT_EARTHQUAKE_DURATION = 5  # Seconds
 
 
-class DeviceManager:
+class DeviceManager(QObject):
     """시리얼 기반 Expo 장치를 묶어서 제어하는 헬퍼."""
 
-    def __init__(self):
+    log_msg = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.obj_6: int | None = None
         self.obj_7: int | None = None
         self.obj_8: list[int] = []
@@ -44,7 +46,7 @@ class DeviceManager:
         except Exception as e:
             print(f"포트 연결 중 오류: {e}")
             raise
-    ##추가 구문
+
     def activate(self):
         """연결된 장치에 'q' 신호를 보내 타입을 수신하고 매핑."""
         print("장치 안정화 중...")
@@ -80,8 +82,10 @@ class DeviceManager:
             except Exception as e:
                 print(f"장치 활성화 오류 (포트 {i}): {e}")
 
-        print(f"장치 매핑 완료: obj_6={self.obj_6}, obj_7={self.obj_7}, "
-              f"obj_8={self.obj_8}, obj_9={self.obj_9}")
+
+        output_str = f"장치 매핑 완료: obj_6={self.obj_6}, obj_7={self.obj_7}, obj_8={self.obj_8}, obj_9={self.obj_9}"
+        self.log_msg.emit(output_str)
+        print(output_str)
 
     def disconnect(self):
         """모든 시리얼 포트 닫기 전 시스템 리셋."""
@@ -112,7 +116,9 @@ class DeviceManager:
         self.set_dot_matrix("통신중")
         self.set_led("GREEN")
         self.reset_earthquake_system()  # 's' 명령 사용
-        print("환경 초기화 완료")
+        output_str = "환경 초기화 완료"
+        self.log_msg.emit(output_str)
+        print(output_str)
 
     def reset_earthquake_system(self):
         """시스템 리셋: 지진 중지 + 복구 플래그 해제 ('s' 명령)."""
